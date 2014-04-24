@@ -1,89 +1,21 @@
 # -*- coding: utf-8 -*-
 """Makes a data view page. See the readme."""
-import datetime
-import fileinput
 import os
 import os.path
 import random
 import shutil
 import subprocess
 import time
-from collections import namedtuple
 
 import blessings
 import simplejson
 
 from data_view import command_options
+from data_view.generation_settings import get_generation_settings
+from data_view.generate_index_html import generate_index_html
+
 
 t = blessings.Terminal()
-
-mod_path = os.path.abspath(os.path.dirname(__file__))
-
-# Resolve module templates -- see usage in parse_cmdline()
-exists_or_none = lambda f: (os.path.exists(f) and f) or None
-resolve_template_path = lambda *subpath: (
-    exists_or_none(os.path.join(mod_path, 'templates', *subpath)) or
-    exists_or_none(os.path.join(os.path.expanduser("~/.config/data_view_templates"), *subpath))
-)
-
-# various util stuff
-date_for_directory_name = lambda: datetime.datetime.now().isoformat().replace(':', '.')
-
-
-# Settings related to template generation
-GenerationSettings = namedtuple("GenerationSettings", [
-    "template_dir",
-    "out_dir",
-    "data",
-])
-
-
-def parse_cmdline_and_load_data():
-    """What it says -- parses the command line, loads input data [from stdin or files].
-
-    :rtype: (GenerationSettings, OptionParser)
-    """
-    cmdopts = command_options.command_line()
-    options, args = cmdopts.parse_args()
-
-    assert len(args) >= 1
-    template_name = args[0]
-    template_dir = resolve_template_path(template_name)
-    data = fileinput.input(files=args[1:], openhook=fileinput.hook_compressed)
-    data = simplejson.loads(''.join(data)) if options.single_json_blob else map(simplejson.loads, data)
-
-    # check that the template / appropriate template files exist.
-    if not template_dir:
-        cmdopts.error(
-            "Couldn't find your template among global templates "
-            "or in ~/.config/data_view_templates"
-        )
-    elif not all(os.path.isfile(os.path.join(template_dir, f)) for f in ['view.html', 'controller.js']):
-        cmdopts.error(
-            "All templates must have a view.html and controller.js file."
-        )
-
-    return (
-        GenerationSettings(
-            template_dir=template_dir,
-            out_dir=(
-                options.output_directory or
-                '{0}-{1}'.format(template_name, date_for_directory_name())
-            ),
-            data=data,
-        ),
-        options
-    )
-
-
-def validate_data(settings):
-    schema_file = os.path.join(settings.template_dir, 'data_jsonschema.yaml')
-    if os.path.isfile(schema_file):
-        import yaml
-        import jsonschema.validators
-        with open(schema_file) as f:
-            validator = jsonschema.validators.Draft4Validator(yaml.safe_load(f))
-        validator.validate(settings.data)
 
 
 def generate_data(settings):
@@ -93,14 +25,24 @@ def generate_data(settings):
     """
     out_file = lambda *subpath: os.path.join(settings.out_dir, *subpath)
 
-    validate_data(settings)
+    # Validate data, if applicable
+    validator = settings.special_template_files.get('data_jsonschema.yaml')
+    validator and validator.validate(settings.data)
 
-    shutil.copytree(settings.template_dir, settings.out_dir)  # will create the dir too.
-    for filename in ['index.html', 'app.js', 'extra.js']:
-        if not os.path.isfile(out_file(filename)):
-            shutil.copy(os.path.join(mod_path, 'static', filename), out_file(filename))
+    # Recursively copy anything from the templates directory, create out_dir too.
+    shutil.copytree(settings.template_dir, settings.out_dir)
+
     with open(out_file('data.json'), 'w') as f:
         simplejson.dump(settings.data, f)
+
+    for filename in ['app.js', 'extra.js']:
+        if not os.path.isfile(out_file(filename)):
+            shutil.copy(os.path.join(settings.system_template_dir, filename), out_file(filename))
+
+    # If templates really want, they can override index.html ... but we advise against it.
+    if not os.path.isfile(out_file('index.html')):
+        with open(out_file('index.html'), 'w') as f:
+            f.write(generate_index_html(settings))
 
 
 def post_generation(output_dir, raw_options):
@@ -115,24 +57,31 @@ def post_generation(output_dir, raw_options):
     if raw_options.scp_output:
         print("\n" + t.magenta("scp'ing output..."))
         subprocess.check_call(['scp', '-Cr', output_dir, raw_options.scp_output])
-        if raw_options.delete_after:
-            print("\n" + t.magenta("deleting output..."))
-            subprocess.check_call(['rm', '-rv', output_dir])
 
     elif not raw_options.no_launch_webserver:
         port = random.randint(7000, 8000)
+        print("\n" + t.magenta("Starting web server; press ctrl+c to stop."))
         web_server = subprocess.Popen(['python', '-m', 'SimpleHTTPServer', str(port)], cwd=output_dir)
-        time.sleep(0.5)
+        time.sleep(0.3)
         assert web_server.poll() is None, "Web server failed."
         if raw_options.launch_browser:
             subprocess.Popen(['open', 'http://localhost:{0}'.format(port)])
-        assert web_server.wait() == 0
+        try:
+            assert web_server.wait() == 0
+        except KeyboardInterrupt:
+            time.sleep(0.3)  # let the simplehttpserver's stderr get flushed
+
+    if raw_options.delete_after:
+        print("\n" + t.magenta("deleting output..."))
+        subprocess.check_call(['rm', '-rv', output_dir])
 
 
 def main():
-    generation_settings, opts = parse_cmdline_and_load_data()
+    cmdopts = command_options.command_line()
+    options, args = cmdopts.parse_args()
+    generation_settings = get_generation_settings(options, args, cmdopts.error)
     generate_data(generation_settings)
-    post_generation(generation_settings.out_dir, opts)
+    post_generation(generation_settings.out_dir, options)
 
 
 if __name__ == "__main__":
