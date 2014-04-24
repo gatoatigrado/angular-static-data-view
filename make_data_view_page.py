@@ -76,6 +76,16 @@ def parse_cmdline_and_load_data():
     )
 
 
+def validate_data(settings):
+    schema_file = os.path.join(settings.template_dir, 'data_jsonschema.yaml')
+    if os.path.isfile(schema_file):
+        import yaml
+        import jsonschema.validators
+        with open(schema_file) as f:
+            validator = jsonschema.validators.Draft4Validator(yaml.safe_load(f))
+        validator.validate(settings.data)
+
+
 def generate_data(settings):
     """Generate a template.
 
@@ -83,9 +93,12 @@ def generate_data(settings):
     """
     out_file = lambda *subpath: os.path.join(settings.out_dir, *subpath)
 
+    validate_data(settings)
+
     shutil.copytree(settings.template_dir, settings.out_dir)  # will create the dir too.
-    shutil.copy(os.path.join(mod_path, 'static', 'index.html'), out_file('index.html'))
-    shutil.copy(os.path.join(mod_path, 'static', 'app.js'), out_file('app.js'))
+    for filename in ['index.html', 'app.js', 'extra.js']:
+        if not os.path.isfile(out_file(filename)):
+            shutil.copy(os.path.join(mod_path, 'static', filename), out_file(filename))
     with open(out_file('data.json'), 'w') as f:
         simplejson.dump(settings.data, f)
 
