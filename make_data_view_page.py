@@ -53,7 +53,7 @@ def parse_cmdline_and_load_data():
     data = simplejson.loads(''.join(data)) if options.single_json_blob else map(simplejson.loads, data)
 
     # check that the template / appropriate template files exist.
-    if not os.path.isdir(template_dir):
+    if not template_dir:
         cmdopts.error(
             "Couldn't find your template among global templates "
             "or in ~/.config/data_view_templates"
