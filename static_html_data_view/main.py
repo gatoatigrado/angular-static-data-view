@@ -76,9 +76,9 @@ def post_generation(output_dir, raw_options):
         subprocess.check_call(['rm', '-rv', output_dir])
 
 
-def main():
+def main(args=None):
     cmdopts = command_options.command_line()
-    options, args = cmdopts.parse_args()
+    options, args = cmdopts.parse_args(args=args)
     generation_settings = get_generation_settings(options, args, cmdopts.error)
     generate_data(generation_settings)
     post_generation(generation_settings.out_dir, options)
