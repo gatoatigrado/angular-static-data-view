@@ -2,6 +2,7 @@
 """Gets the raw options."""
 import optparse
 
+
 def command_line():
     """Gets a command line options instance.
 

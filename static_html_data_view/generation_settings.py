@@ -23,6 +23,7 @@ resolve_template_path = lambda *subpath: (
     exists_or_none(os.path.join(os.path.expanduser("~/.config/data_view_templates"), *subpath))
 )
 
+
 date_for_directory_name = lambda: datetime.datetime.now().isoformat().replace(':', '.')
 
 
