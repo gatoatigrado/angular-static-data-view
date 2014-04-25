@@ -17,4 +17,9 @@ setup(
         'simplejson',
     ],
     packages=find_packages(exclude=['tests*']),
+    entry_points={
+        'console_scripts': [
+            'make_data_view_page=static_html_data_view.main:main',
+        ],
+    },
 )
