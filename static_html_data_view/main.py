@@ -10,9 +10,9 @@ import time
 import blessings
 import simplejson
 
-from data_view import command_options
-from data_view.generation_settings import get_generation_settings
-from data_view.generate_index_html import generate_index_html
+from static_html_data_view import command_options
+from static_html_data_view.generation_settings import get_generation_settings
+from static_html_data_view.generate_index_html import generate_index_html
 
 
 t = blessings.Terminal()
