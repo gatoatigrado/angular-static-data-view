@@ -10,11 +10,16 @@ import jsonschema
 import simplejson
 import yaml
 
-mod_path = os.path.dirname(os.path.abspath(os.path.dirname(__file__)))
+mod_path = os.path.abspath(os.path.dirname(__file__))
+SYSTEM_TEMPLATE_DIR = os.path.join(mod_path, 'static')
+BUNDLED_TEMPLATES_DIR = os.path.join(mod_path, 'templates')
+assert os.path.isdir(SYSTEM_TEMPLATE_DIR)
+assert os.path.isdir(BUNDLED_TEMPLATES_DIR)
+
 
 exists_or_none = lambda f: (os.path.exists(f) and f) or None
 resolve_template_path = lambda *subpath: (
-    exists_or_none(os.path.join(mod_path, 'templates', *subpath)) or
+    exists_or_none(os.path.join(BUNDLED_TEMPLATES_DIR, *subpath)) or
     exists_or_none(os.path.join(os.path.expanduser("~/.config/data_view_templates"), *subpath))
 )
 
@@ -40,10 +45,6 @@ SPECIAL_TEMPLATE_FILES = {
 }
 
 
-SYSTEM_TEMPLATE_DIR = os.path.join(mod_path, 'static')
-assert os.path.isdir(SYSTEM_TEMPLATE_DIR)
-
-
 def get_generation_settings(options, args, error_fcn):
     """What it says -- parses the command line, loads input data [from stdin or files].
 
@@ -66,7 +67,7 @@ def get_generation_settings(options, args, error_fcn):
 
     # check that the template / appropriate template files exist.
     if not template_dir:
-        cmdopts.error(
+        error_fcn(
             "Couldn't find your template among global templates "
             "or in ~/.config/data_view_templates"
         )
