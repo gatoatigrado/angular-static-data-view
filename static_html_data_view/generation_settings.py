@@ -69,8 +69,8 @@ def get_generation_settings(options, args, error_fcn):
     # check that the template / appropriate template files exist.
     if not template_dir:
         error_fcn(
-            "Couldn't find your template among global templates "
-            "or in ~/.config/data_view_templates"
+            "Couldn't find your template {0} among global templates "
+            "or in ~/.config/data_view_templates".format(template_name)
         )
 
     special_template_files = {}
